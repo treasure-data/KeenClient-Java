@@ -1174,7 +1174,7 @@ public class KeenClient {
             @Override
             public void writeTo(OutputStream out) throws IOException {
                 OutputStreamWriter writer = new OutputStreamWriter(out, ENCODING);
-                jsonHandler.writeJson(writer, requestData);
+                jsonHandler.writeJsonWithoutEncryption(writer, requestData);
             }
         };
 
@@ -1182,7 +1182,7 @@ public class KeenClient {
         if (KeenLogging.isLoggingEnabled()) {
             try {
                 StringWriter writer = new StringWriter();
-                jsonHandler.writeJson(writer, requestData);
+                jsonHandler.writeJsonWithoutEncryption(writer, requestData);
                 String request = writer.toString();
                 KeenLogging.log(String.format(Locale.US, "Sent request '%s' to URL '%s'",
                         request, url.toString()));
@@ -1232,7 +1232,7 @@ public class KeenClient {
         // Parse the response into a map.
         StringReader reader = new StringReader(response);
         Map<String, Object> responseMap;
-        responseMap = jsonHandler.readJson(reader);
+        responseMap = jsonHandler.readJsonWithoutDecryption(reader);
 
         // It's not obvious what the best way is to try and recover from them, but just hoping it
         // doesn't happen is probably the wrong answer.

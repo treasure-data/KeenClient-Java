@@ -31,6 +31,8 @@ public interface KeenJsonHandler {
      */
     Map<String, Object> readJson(Reader reader) throws IOException;
 
+    Map<String, Object> readJsonWithoutDecryption(Reader reader) throws IOException;
+
     /**
      * Writes the given object (in the form of a {@code Map&lt;String, Object&gt;} to the specified
      * {@link java.io.Writer}.
@@ -41,4 +43,5 @@ public interface KeenJsonHandler {
      */
     void writeJson(Writer writer, Map<String, ?> value) throws IOException;
 
+    void writeJsonWithoutEncryption(Writer writer, Map<String, ?> value) throws IOException;
 }
