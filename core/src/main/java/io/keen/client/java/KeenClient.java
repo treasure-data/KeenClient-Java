@@ -49,7 +49,6 @@ import io.keen.client.java.http.UrlConnectionHttpHandler;
  * @since 1.0.0
  */
 public class KeenClient {
-
     ///// PUBLIC STATIC METHODS /////
 
     /**
@@ -255,11 +254,13 @@ public class KeenClient {
     public void queueEvent(KeenProject project, String eventCollection, Map<String, Object> event,
                            Map<String, Object> keenProperties, final KeenCallback callback) {
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INIT_ERROR);
         if (!isActive) {
             handleLibraryInactive(callback);
             return;
         }
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INVALID_PARAM);
         if (project == null && defaultProject == null) {
             handleFailure(null, new IllegalStateException("No project specified, but no default project found"));
             return;
@@ -268,6 +269,7 @@ public class KeenClient {
 
         try {
             // Build the event
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
             Map<String, Object> newEvent =
                     validateAndBuildEvent(useProject, eventCollection, event, keenProperties);
 
@@ -278,6 +280,7 @@ public class KeenClient {
             KeenUtils.closeQuietly(writer);
 
             // Save the JSON event out to the event store.
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_STORAGE_ERROR);
             eventStore.store(useProject.getProjectId(), eventCollection, jsonEvent);
             handleSuccess(callback);
         } catch (Exception e) {
@@ -314,11 +317,13 @@ public class KeenClient {
      */
     public synchronized void sendQueuedEvents(KeenProject project, KeenCallback callback) {
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INIT_ERROR);
         if (!isActive) {
             handleLibraryInactive(callback);
             return;
         }
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INVALID_PARAM);
         if (project == null && defaultProject == null) {
             handleFailure(null, new IllegalStateException("No project specified, but no default project found"));
             return;
@@ -327,11 +332,14 @@ public class KeenClient {
 
         try {
             String projectId = useProject.getProjectId();
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_STORAGE_ERROR);
             Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId);
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
             Map<String, List<Map<String, Object>>> events = buildEventMap(eventHandles);
-            String response = publishAll(useProject, events);
+            String response = publishAll(useProject, callback, events);
             if (response != null) {
                 try {
+                    setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
                     handleAddEventsResponse(eventHandles, response);
                 } catch (Exception e) {
                     // Errors handling the response are non-fatal; just log them.
@@ -373,11 +381,13 @@ public class KeenClient {
      */
     public void sendQueuedEventsAsync(final KeenProject project, final KeenCallback callback) {
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INIT_ERROR);
         if (!isActive) {
             handleLibraryInactive(callback);
             return;
         }
 
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_INVALID_PARAM);
         if (project == null && defaultProject == null) {
             handleFailure(null, new IllegalStateException("No project specified, but no default project found"));
             return;
@@ -1141,12 +1151,13 @@ public class KeenClient {
      * @throws IOException If there was an error communicating with the server.
      */
     private String publishAll(KeenProject project,
+                              KeenCallback callback,
                               Map<String, List<Map<String, Object>>> events) throws IOException {
         // just using basic JDK HTTP library
         String urlString = String.format(Locale.US, "%s/%s/projects/%s/events", getBaseUrl(),
                 KeenConstants.API_VERSION, project.getProjectId());
         URL url = new URL(urlString);
-        return publishObject(project, url, events);
+        return publishObject(project, url, callback, events);
     }
 
     /**
@@ -1162,7 +1173,12 @@ public class KeenClient {
      * @return The response from the server.
      * @throws IOException If there was an error communicating with the server.
      */
+    private String publishObject(KeenProject project, URL url, final Map<String, ?> requestData) throws IOException {
+        return publishObject(project, url, null, requestData);
+    }
+
     private synchronized String publishObject(KeenProject project, URL url,
+                                              KeenCallback callback,
                                               final Map<String, ?> requestData) throws IOException {
         if (requestData == null || requestData.size() == 0) {
             KeenLogging.log("No API calls were made because there were no events to upload");
@@ -1193,6 +1209,7 @@ public class KeenClient {
         }
 
         // Send the request.
+        setCallbackToCurrentErrorCode(callback, ERROR_CODE_NETWORK_ERROR);
         String writeKey = project.getWriteKey();
         Request request = new Request(url, "POST", writeKey, source);
         Response response = httpHandler.execute(request);
@@ -1208,6 +1225,7 @@ public class KeenClient {
         if (response.isSuccess()) {
             return response.body;
         } else {
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_SERVER_RESPONSE);
             throw new ServerException(response.body);
         }
     }
@@ -1343,4 +1361,20 @@ public class KeenClient {
                 "properly and is inactive"));
     }
 
+    ///// Extending for TD /////
+    public static final String ERROR_CODE_INIT_ERROR = "init_error";
+    public static final String ERROR_CODE_INVALID_PARAM = "invalid_param";
+    public static final String ERROR_CODE_DATA_CONVERSION = "data_conversion";
+    public static final String ERROR_CODE_STORAGE_ERROR = "storage_error";
+    public static final String ERROR_CODE_NETWORK_ERROR = "network_error";
+    public static final String ERROR_CODE_SERVER_RESPONSE = "server_response";
+    public interface KeenCallbackWithErrorCode extends KeenCallback {
+        void setErrorCode(String errorCode);
+        String getErrorCode();
+    }
+    private void setCallbackToCurrentErrorCode(KeenCallback callback, String errorCode) {
+        if (callback instanceof KeenCallbackWithErrorCode) {
+            ((KeenCallbackWithErrorCode) callback).setErrorCode(errorCode);
+        }
+    }
 }
