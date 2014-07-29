@@ -269,7 +269,7 @@ public class KeenClient {
 
         try {
             // Build the event
-            setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
+            setCallbackToCurrentErrorCode(callback, ERROR_CODE_INVALID_EVENT);
             Map<String, Object> newEvent =
                     validateAndBuildEvent(useProject, eventCollection, event, keenProperties);
 
@@ -1364,6 +1364,7 @@ public class KeenClient {
     ///// Extending for TD /////
     public static final String ERROR_CODE_INIT_ERROR = "init_error";
     public static final String ERROR_CODE_INVALID_PARAM = "invalid_param";
+    public static final String ERROR_CODE_INVALID_EVENT = "invalid_event";
     public static final String ERROR_CODE_DATA_CONVERSION = "data_conversion";
     public static final String ERROR_CODE_STORAGE_ERROR = "storage_error";
     public static final String ERROR_CODE_NETWORK_ERROR = "network_error";
