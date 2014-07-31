@@ -2,6 +2,8 @@
 
 apply plugin: 'java'
 
+sourceCompatibility = 1.6
+
 dependencies {
     testCompile 'com.fasterxml.jackson.core:jackson-databind:2.3.0'
     testCompile 'commons-io:commons-io:2.4'
