@@ -1098,9 +1098,11 @@ public class KeenClient {
             Map<String, List<Object>> eventHandles) throws IOException {
         Map<String, List<Map<String, Object>>> result =
                 new HashMap<String, List<Map<String, Object>>>();
+
         for (Map.Entry<String, List<Object>> entry : eventHandles.entrySet()) {
             String eventCollection = entry.getKey();
             List<Object> handles = entry.getValue();
+            List<Object> removedHandles = new ArrayList<Object>();
 
             // Skip event collections that don't contain any events.
             if (handles == null || handles.size() == 0) {
@@ -1117,9 +1119,16 @@ public class KeenClient {
                 StringReader reader = new StringReader(jsonEvent);
                 Map<String, Object> event = jsonHandler.readJson(reader);
                 KeenUtils.closeQuietly(reader);
+                if (event == null) {
+                    KeenLogging.log("This event can't handle as a proper JSON. Removing it...");
+                    eventStore.remove(handle);
+                    removedHandles.add(handle);
+                    continue;
+                }
                 events.add(event);
             }
             result.put(eventCollection, events);
+            entry.getValue().removeAll(removedHandles);
         }
         return result;
     }
