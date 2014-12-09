@@ -336,7 +336,23 @@ public class KeenClient {
             Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId);
             setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
             Map<String, List<Map<String, Object>>> events = buildEventMap(eventHandles);
-            String response = publishAll(useProject, callback, events);
+
+            // Retry uploading `uploadRetryCount` times
+            String response = null;
+            for (int i = 0; i < uploadRetryCount; i++) {
+                try {
+                    response = publishAll(useProject, callback, events);
+                    break;
+                } catch (Exception e) {
+                    KeenLogging.log("publishAll error occurred(" + i + "/" + uploadRetryCount + ") : " + e.getMessage());
+                    if (!enableRetryUploading || i >= uploadRetryCount - 1) {
+                        throw e;
+                    }
+                    double wait = Math.pow(2.0, Float.valueOf(String.valueOf(i)));
+                    Thread.sleep((long) (wait * 1000));
+                }
+            }
+
             if (response != null) {
                 try {
                     setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
@@ -1378,6 +1394,8 @@ public class KeenClient {
     public static final String ERROR_CODE_STORAGE_ERROR = "storage_error";
     public static final String ERROR_CODE_NETWORK_ERROR = "network_error";
     public static final String ERROR_CODE_SERVER_RESPONSE = "server_response";
+    protected int uploadRetryCount = 7;
+    protected boolean enableRetryUploading = true;
     public interface KeenCallbackWithErrorCode extends KeenCallback {
         void setErrorCode(String errorCode);
         String getErrorCode();
