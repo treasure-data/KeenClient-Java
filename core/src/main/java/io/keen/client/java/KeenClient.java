@@ -348,7 +348,7 @@ public class KeenClient {
                     if (!enableRetryUploading || i >= uploadRetryCount - 1) {
                         throw e;
                     }
-                    double wait = Math.pow(2.0, Float.valueOf(String.valueOf(i)));
+                    double wait = uploadRetryIntervalCoeficient * Math.pow(uploadRetryIntervalBase, Float.valueOf(String.valueOf(i)));
                     Thread.sleep((long) (wait * 1000));
                 }
             }
@@ -1394,7 +1394,17 @@ public class KeenClient {
     public static final String ERROR_CODE_STORAGE_ERROR = "storage_error";
     public static final String ERROR_CODE_NETWORK_ERROR = "network_error";
     public static final String ERROR_CODE_SERVER_RESPONSE = "server_response";
-    protected int uploadRetryCount = 7;
+    /*
+    > 5.times.inject(0){|a, i| puts a; x = 4 * (2 ** i); a += x; a}
+      0
+      4
+      12
+      28
+      60
+     */
+    protected int uploadRetryIntervalCoeficient = 4;
+    protected int uploadRetryIntervalBase = 2;
+    protected int uploadRetryCount = 5;
     protected boolean enableRetryUploading = true;
     public interface KeenCallbackWithErrorCode extends KeenCallback {
         void setErrorCode(String errorCode);
