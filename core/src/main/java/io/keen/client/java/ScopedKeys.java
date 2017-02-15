@@ -16,17 +16,6 @@ import io.keen.client.java.exceptions.ScopedKeyException;
 /**
  * ScopedKeys is a utility class for dealing with Keen IO Scoped Keys. You'll probably only ever need the
  * encrypt method. However, for completeness, there's also a decrypt method.
- * <p/>
- * Example usage:
- * <p/>
- * <pre>
- *     String apiKey = "YOUR_API_KEY_HERE";
- *     // create the options we'll use
- *     Map<String, Object> options = new HashMap<String, Object>();
- *     options.put("allowed_operations", Arrays.asList("write"));
- *     // do the encryption
- *     String scopedKey = ScopedKeys.encrypt(apiKey, options);
- * </pre>
  *
  * @author dkador
  * @since 1.0.3
