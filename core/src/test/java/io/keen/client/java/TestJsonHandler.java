@@ -29,12 +29,26 @@ class TestJsonHandler implements KeenJsonHandler {
         return mapper.readValue(reader, MAP_TYPE);
     }
 
+    @Override
+    public Map<String, Object> readJsonWithoutDecryption(Reader reader)
+            throws IOException
+    {
+        return null;
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public void writeJson(Writer writer, Map<String, ?> value) throws IOException {
         mapper.writeValue(writer, value);
+    }
+
+    @Override
+    public void writeJsonWithoutEncryption(Writer writer, Map<String, ?> value)
+            throws IOException
+    {
+
     }
 
     ///// DEFAULT ACCESS CONSTRUCTORS /////
