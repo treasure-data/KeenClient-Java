@@ -69,7 +69,7 @@ public abstract class EventStoreTestBase {
         store.store("project1", "collection2", TEST_EVENT_2);
 
         // Get the handle map.
-        Map<String, List<Object>> handleMap = store.getHandles("project1");
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 100);
         assertNotNull(handleMap);
         assertEquals(2, handleMap.size());
 
@@ -88,7 +88,7 @@ public abstract class EventStoreTestBase {
 
     @Test
     public void getHandlesNoEvents() throws Exception {
-        Map<String, List<Object>> handleMap = store.getHandles("project1");
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 100);
         assertNotNull(handleMap);
         assertEquals(0, handleMap.size());
     }
@@ -102,14 +102,14 @@ public abstract class EventStoreTestBase {
         store.store("project2", "collection3", TEST_EVENT_4);
 
         // Get and validate the handle map for project 1.
-        Map<String, List<Object>> handleMap = store.getHandles("project1");
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 100);
         assertNotNull(handleMap);
         assertEquals(2, handleMap.size());
         assertEquals(1, handleMap.get("collection1").size());
         assertEquals(1, handleMap.get("collection2").size());
 
         // Get and validate the handle map for project 2.
-        handleMap = store.getHandles("project2");
+        handleMap = store.getHandles("project2", 100);
         assertNotNull(handleMap);
         assertEquals(1, handleMap.size());
         assertEquals(2, handleMap.get("collection3").size());

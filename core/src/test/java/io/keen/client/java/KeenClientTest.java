@@ -296,7 +296,7 @@ public class KeenClientTest {
 
         // Check that the expected number of events are in the store.
         RamEventStore store = (RamEventStore) client.getEventStore();
-        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(1, handleMap.size());
         assertEquals(3, handleMap.get(TEST_COLLECTION).size());
 
@@ -304,7 +304,7 @@ public class KeenClientTest {
         client.sendQueuedEvents();
 
         // Validate that the store is now empty.
-        handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(0, handleMap.size());
 
         // Try sending events again; this should be a no-op.
@@ -312,7 +312,7 @@ public class KeenClientTest {
         client.sendQueuedEvents();
 
         // Validate that the store is still empty.
-        handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(0, handleMap.size());
     }
 
@@ -325,7 +325,7 @@ public class KeenClientTest {
 
         // Check that the expected number of events are in the store.
         RamEventStore store = (RamEventStore) client.getEventStore();
-        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(1, handleMap.size());
         assertEquals(3, handleMap.get(TEST_COLLECTION).size());
 
@@ -341,7 +341,7 @@ public class KeenClientTest {
         client.sendQueuedEvents();
 
         // Validate that the store still contains the failed event, but not the other events.
-        handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(1, handleMap.size());
         List<Object> handles = handleMap.get(TEST_COLLECTION);
         assertEquals(1, handles.size());
@@ -368,7 +368,7 @@ public class KeenClientTest {
 
         // Validate that the store still contains all the events.
         RamEventStore store = (RamEventStore) client.getEventStore();
-        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(1, handleMap.size());
         List<Object> handles = handleMap.get(TEST_COLLECTION);
         assertEquals(3, handles.size());
@@ -385,11 +385,11 @@ public class KeenClientTest {
 
         // Check that the expected number of events are in the store, in the expected collections
         RamEventStore store = (RamEventStore) client.getEventStore();
-        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId());
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
         assertEquals(2, handleMap.size());
         assertEquals(1, handleMap.get(TEST_COLLECTION).size());
         assertEquals(1, handleMap.get(TEST_COLLECTION_2).size());
-        handleMap = store.getHandles(otherProject.getProjectId());
+        handleMap = store.getHandles(otherProject.getProjectId(), 100);
         assertEquals(1, handleMap.size());
         assertEquals(2, handleMap.get(TEST_COLLECTION).size());
     }

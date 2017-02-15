@@ -50,7 +50,7 @@ public class FileEventStoreTest extends EventStoreTestBase {
     public void existingEventFilesFound() throws Exception {
         writeEventFile("keen/project1/collection1/1393564454103.0", TEST_EVENT_1);
         writeEventFile("keen/project1/collection1/1393564454104.0", TEST_EVENT_2);
-        Map<String, List<Object>> handleMap = store.getHandles("project1");
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 100);
         assertNotNull(handleMap);
         assertEquals(1, handleMap.size());
         List<Object> handles = handleMap.get("collection1");
@@ -62,6 +62,23 @@ public class FileEventStoreTest extends EventStoreTestBase {
         }
         assertTrue(events.contains(TEST_EVENT_1));
         assertTrue(events.contains(TEST_EVENT_2));
+    }
+
+    @Test
+    public void existingLimitedEventFilesFound() throws Exception {
+        writeEventFile("keen/project1/collection1/1393564454103.0", TEST_EVENT_1);
+        writeEventFile("keen/project1/collection1/1393564454104.0", TEST_EVENT_2);
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 1);
+        assertNotNull(handleMap);
+        assertEquals(1, handleMap.size());
+        List<Object> handles = handleMap.get("collection1");
+        assertNotNull(handles);
+        assertEquals(1, handles.size());
+        List<String> events = new ArrayList<String>();
+        for (Object handle : handles) {
+            events.add(store.get(handle));
+        }
+        assertTrue(events.contains(TEST_EVENT_1));
     }
 
     private void writeEventFile(String path, String data) throws IOException {

@@ -38,7 +38,7 @@ public class RamEventStoreTest extends EventStoreTestBase {
         store.store("project1", "collection1", TEST_EVENT_5);
 
         // Get the handle map.
-        Map<String, List<Object>> handleMap = store.getHandles("project1");
+        Map<String, List<Object>> handleMap = store.getHandles("project1", 100);
         assertNotNull(handleMap);
         assertEquals(1, handleMap.size());
 
