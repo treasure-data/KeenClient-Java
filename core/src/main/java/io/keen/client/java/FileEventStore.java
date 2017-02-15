@@ -117,10 +117,10 @@ public class FileEventStore implements KeenEventStore {
      * {@inheritDoc}
      */
     @Override
-    public Map<String, List<Object>> getHandles(String projectId) throws IOException {
+    public Map<String, List<Object>> getHandles(String projectId, int limit) throws IOException {
         File projectDir = getProjectDir(projectId, false);
         if (projectDir.exists() && projectDir.isDirectory()) {
-            return getHandlesFromProjectDirectory(projectDir);
+            return getHandlesFromProjectDirectory(projectDir, limit);
         } else {
             return new HashMap<String, List<Object>>();
         }
@@ -153,10 +153,11 @@ public class FileEventStore implements KeenEventStore {
      * Gets the handle map for all collections in the specified project cache directory.
      *
      * @param projectDir The cache directory for the project.
-     * @return The handle map. See {@link #getHandles(String)} for details.
+     * @param limit
+     * @return The handle map. See {@link #getHandles(String, int)} for details.
      * @throws IOException If there is an error reading the event files.
      */
-    private Map<String, List<Object>> getHandlesFromProjectDirectory(File projectDir) throws
+    private Map<String, List<Object>> getHandlesFromProjectDirectory(File projectDir, int limit) throws
             IOException {
         File[] collectionDirs = getSubDirectories(projectDir);
 
@@ -167,6 +168,9 @@ public class FileEventStore implements KeenEventStore {
                 String collectionName = directory.getName();
                 File[] files = getFilesInDir(directory);
                 if (files != null) {
+                    if (files.length > limit) {
+                        files = Arrays.asList(files).subList(0, limit).toArray(new File[] {});
+                    }
                     List<Object> handleList = new ArrayList<Object>();
                     handleList.addAll(Arrays.asList(files));
                     handleMap.put(collectionName, handleList);

@@ -87,7 +87,7 @@ public class RamEventStore implements KeenEventStore {
      * {@inheritDoc}
      */
     @Override
-    public synchronized Map<String, List<Object>> getHandles(String projectId) throws IOException {
+    public synchronized Map<String, List<Object>> getHandles(String projectId, int limit) throws IOException {
         Map<String, List<Object>> result = new HashMap<String, List<Object>>();
         for (Map.Entry<String, List<Long>> entry : collectionIds.entrySet()) {
             String key = entry.getKey();

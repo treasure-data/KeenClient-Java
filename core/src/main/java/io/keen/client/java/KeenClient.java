@@ -49,6 +49,8 @@ import io.keen.client.java.http.UrlConnectionHttpHandler;
  * @since 1.0.0
  */
 public class KeenClient {
+    private int maxUploadEventsAtOnce = 400;
+
     ///// PUBLIC STATIC METHODS /////
 
     /**
@@ -93,6 +95,16 @@ public class KeenClient {
     }
 
     ///// PUBLIC METHODS //////
+
+    public int getMaxUploadEventsAtOnce()
+    {
+        return maxUploadEventsAtOnce;
+    }
+
+    public void setMaxUploadEventsAtOnce(int maxUploadEventsAtOnce)
+    {
+        this.maxUploadEventsAtOnce = maxUploadEventsAtOnce;
+    }
 
     /**
      * Adds an event to the default project with default Keen properties and no callbacks.
@@ -331,37 +343,51 @@ public class KeenClient {
         KeenProject useProject = (project == null ? defaultProject : project);
 
         try {
-            String projectId = useProject.getProjectId();
-            setCallbackToCurrentErrorCode(callback, ERROR_CODE_STORAGE_ERROR);
-            Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId);
-            setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-            Map<String, List<Map<String, Object>>> events = buildEventMap(eventHandles);
+            boolean hasNext;
+            do {
+                String projectId = useProject.getProjectId();
+                setCallbackToCurrentErrorCode(callback, ERROR_CODE_STORAGE_ERROR);
+                Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId, maxUploadEventsAtOnce);
+                setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
+                Map<String, List<Map<String, Object>>> events = buildEventMap(eventHandles);
 
-            // Retry uploading `uploadRetryCount` times
-            String response = null;
-            for (int i = 0; i < uploadRetryCount; i++) {
-                try {
-                    response = publishAll(useProject, callback, events);
-                    break;
-                } catch (Exception e) {
-                    KeenLogging.log("publishAll error occurred(" + i + "/" + uploadRetryCount + ") : " + e.getMessage());
-                    if (!enableRetryUploading || i >= uploadRetryCount - 1) {
-                        throw e;
+                // Retry uploading `uploadRetryCount` times
+                String response = null;
+                for (int i = 0; i < uploadRetryCount; i++) {
+                    try {
+                        response = publishAll(useProject, callback, events);
+                        break;
                     }
-                    double wait = uploadRetryIntervalCoeficient * Math.pow(uploadRetryIntervalBase, Float.valueOf(String.valueOf(i)));
-                    Thread.sleep((long) (wait * 1000));
+                    catch (Exception e) {
+                        KeenLogging.log("publishAll error occurred(" + i + "/" + uploadRetryCount + ") : " + e.getMessage());
+                        if (!enableRetryUploading || i >= uploadRetryCount - 1) {
+                            throw e;
+                        }
+                        double wait = uploadRetryIntervalCoeficient * Math.pow(uploadRetryIntervalBase, Float.valueOf(String.valueOf(i)));
+                        Thread.sleep((long) (wait * 1000));
+                    }
                 }
-            }
 
-            if (response != null) {
-                try {
-                    setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-                    handleAddEventsResponse(eventHandles, response);
-                } catch (Exception e) {
-                    // Errors handling the response are non-fatal; just log them.
-                    KeenLogging.log("Error handling response to batch publish: " + e.getMessage());
+                if (response != null) {
+                    try {
+                        setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
+                        handleAddEventsResponse(eventHandles, response);
+                    }
+                    catch (Exception e) {
+                        // Errors handling the response are non-fatal; just log them.
+                        KeenLogging.log("Error handling response to batch publish: " + e.getMessage());
+                    }
                 }
-            }
+
+                Map<String, List<Object>> remainingHandles = getEventStore().getHandles(projectId, 1);
+                long remainingEvents = 0;
+                for (Map.Entry<String, List<Object>> handle : remainingHandles.entrySet()) {
+                    remainingEvents += handle.getValue().size();
+                }
+
+                hasNext = remainingEvents > 0;
+            } while (hasNext);
+
             handleSuccess(callback);
         } catch (Exception e) {
             handleFailure(callback, e);

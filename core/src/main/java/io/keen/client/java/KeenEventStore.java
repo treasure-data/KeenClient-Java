@@ -29,7 +29,7 @@ public interface KeenEventStore {
      *
      * @param handle A handle returned from a previous call to {@link #store(String, String,
      * String)}
-     *               or {@link #getHandles(String)}.
+     *               or {@link #getHandles(String, int)}.
      * @return The serialized JSON for the event, or null if the handle is no longer present in
      * the store.
      * @throws IOException If there is an error retrieving the event.
@@ -41,7 +41,7 @@ public interface KeenEventStore {
      *
      * @param handle A handle returned from a previous call to {@link #store(String, String,
      * String)}
-     *               or {@link #getHandles(String)}.
+     *               or {@link #getHandles(String, int)}.
      * @throws IOException If there is an error removing the event.
      */
     void remove(Object handle) throws IOException;
@@ -57,6 +57,6 @@ public interface KeenEventStore {
      * collection. If there are no events, an empty map will be returned.
      * @throws IOException If there is an error retrieving the handles.
      */
-    Map<String, List<Object>> getHandles(String projectId) throws IOException;
+    Map<String, List<Object>> getHandles(String projectId, int limit) throws IOException;
 
 }
