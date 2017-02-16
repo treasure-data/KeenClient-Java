@@ -164,12 +164,20 @@ public class FileEventStore implements KeenEventStore {
         Map<String, List<Object>> handleMap = new HashMap<String, List<Object>>();
         if (collectionDirs != null) {
             // iterate through the directories
+            int count = 0;
             for (File directory : collectionDirs) {
                 String collectionName = directory.getName();
                 File[] files = getFilesInDir(directory);
                 if (files != null) {
-                    if (files.length > limit) {
-                        files = Arrays.asList(files).subList(0, limit).toArray(new File[] {});
+                    if (count + files.length > limit) {
+                        files = Arrays.asList(files).subList(0, limit - count).toArray(new File[] {});
+                        count = limit;
+                    }
+                    else {
+                        count += files.length;
+                    }
+                    if (files.length == 0) {
+                        continue;
                     }
                     List<Object> handleList = new ArrayList<Object>();
                     handleList.addAll(Arrays.asList(files));
