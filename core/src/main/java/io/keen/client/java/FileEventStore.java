@@ -201,7 +201,7 @@ public class FileEventStore implements KeenEventStore {
     private File getKeenCacheDirectory() throws IOException {
         File file = new File(root, "keen");
         if (!file.exists()) {
-            boolean dirMade = file.mkdir();
+            boolean dirMade = file.mkdirs();
             if (!dirMade) {
                 throw new IOException("Could not make keen cache directory at: " + file.getAbsolutePath());
             }
