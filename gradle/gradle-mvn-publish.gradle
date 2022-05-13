@@ -1,77 +1,77 @@
-apply plugin: 'maven'
-apply plugin: 'signing'
+//apply plugin: 'maven'
+//apply plugin: 'signing'
 
-def isReleaseBuild() {
-    return !version.endsWith("SNAPSHOT")
-}
+//def isReleaseBuild() {
+//    return !version.endsWith("SNAPSHOT")
+//}
+//
+//def sonatypeRepositoryUrl
+//if (isReleaseBuild()) {
+//    sonatypeRepositoryUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+//} else {
+//    sonatypeRepositoryUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+//}
+//
+//uploadArchives.repositories.mavenDeployer {
+//    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+//
+//    pom.artifactId = POM_ARTIFACT_ID
+//    pom.groupId = GROUP
+//    pom.version = VERSION_NAME
+//
+//    if (project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')) {
+//        repository(url: sonatypeRepositoryUrl) {
+//            authentication(userName: project.sonatypeUsername, password: project.sonatypePassword)
+//        }
+//    }
+//
+//    pom.project {
+//        name POM_NAME
+//        packaging POM_PACKAGING
+//        description POM_DESCRIPTION
+//        url POM_URL
+//
+//        organization {
+//            name POM_ORG_NAME
+//            url POM_ORG_URL
+//        }
+//
+//        scm {
+//            url POM_SCM_URL
+//            connection POM_SCM_CONNECTION
+//            developerConnection POM_SCM_DEV_CONNECTION
+//        }
+//
+//        licenses {
+//            license {
+//                name POM_LICENSE_NAME
+//                url POM_LICENSE_URL
+//                distribution POM_LICENSE_DIST
+//            }
+//        }
+//
+//        developers {
+//            developer {
+//                id POM_DEVELOPER_ID
+//                name POM_DEVELOPER_NAME
+//                email POM_DEVELOPER_EMAIL
+//            }
+//        }
+//    }
+//
+//    // The Java and Android projects depend on Core during build, but before packaging the Core
+//    // classes are automatically included into the JARs. To prevent duplication of those classes,
+//    // remove the dependency on Core from the POM files.
+//    pom.whenConfigured { p ->
+//        p.dependencies.removeAll {
+//            it.artifactId.equals("keen-client-java-core")
+//        }
+//    }
+//}
 
-def sonatypeRepositoryUrl
-if (isReleaseBuild()) {
-    sonatypeRepositoryUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-} else {
-    sonatypeRepositoryUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
-}
-
-uploadArchives.repositories.mavenDeployer {
-    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-    pom.artifactId = POM_ARTIFACT_ID
-    pom.groupId = GROUP
-    pom.version = VERSION_NAME
-
-    if (project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')) {
-        repository(url: sonatypeRepositoryUrl) {
-            authentication(userName: project.sonatypeUsername, password: project.sonatypePassword)
-        }
-    }
-
-    pom.project {
-        name POM_NAME
-        packaging POM_PACKAGING
-        description POM_DESCRIPTION
-        url POM_URL
-
-        organization {
-            name POM_ORG_NAME
-            url POM_ORG_URL
-        }
-
-        scm {
-            url POM_SCM_URL
-            connection POM_SCM_CONNECTION
-            developerConnection POM_SCM_DEV_CONNECTION
-        }
-
-        licenses {
-            license {
-                name POM_LICENSE_NAME
-                url POM_LICENSE_URL
-                distribution POM_LICENSE_DIST
-            }
-        }
-
-        developers {
-            developer {
-                id POM_DEVELOPER_ID
-                name POM_DEVELOPER_NAME
-                email POM_DEVELOPER_EMAIL
-            }
-        }
-    }
-
-    // The Java and Android projects depend on Core during build, but before packaging the Core
-    // classes are automatically included into the JARs. To prevent duplication of those classes,
-    // remove the dependency on Core from the POM files.
-    pom.whenConfigured { p ->
-        p.dependencies.removeAll {
-            it.artifactId.equals("keen-client-java-core")
-        }
-    }
-}
-
-signing {
-    required {
-        isReleaseBuild() && gradle.taskGraph.hasTask("uploadArchives")
-    }
-    sign configurations.archives
-}
+//signing {
+//    required {
+//        isReleaseBuild() && gradle.taskGraph.hasTask("uploadArchives")
+//    }
+//    sign configurations.archives
+//}

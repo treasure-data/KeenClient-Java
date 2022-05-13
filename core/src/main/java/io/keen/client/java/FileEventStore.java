@@ -217,11 +217,13 @@ public class FileEventStore implements KeenEventStore {
      * @throws IOException If there is an error listing the files in the directory.
      */
     private File[] getSubDirectories(File parent) throws IOException {
-        return parent.listFiles(new FileFilter() { // Can return null if there are no events
+        File[] files = parent.listFiles(new FileFilter() { // Can return null if there are no events
             public boolean accept(File file) {
                 return file.isDirectory();
             }
         });
+        Arrays.sort(files);
+        return files;
     }
 
     /**
@@ -231,11 +233,13 @@ public class FileEventStore implements KeenEventStore {
      * @return An array containing all of the files in the given directory.
      */
     private File[] getFilesInDir(File dir) {
-        return dir.listFiles(new FileFilter() {
+        File[] files = dir.listFiles(new FileFilter() {
             public boolean accept(File file) {
                 return file.isFile();
             }
         });
+        Arrays.sort(files);
+        return files;
     }
 
     /**

@@ -9,7 +9,9 @@ import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -343,50 +345,64 @@ public class KeenClient {
         KeenProject useProject = (project == null ? defaultProject : project);
 
         try {
-            boolean hasNext;
+            boolean doRetry;
+            int retryCounter = 0;
             do {
                 String projectId = useProject.getProjectId();
                 setCallbackToCurrentErrorCode(callback, ERROR_CODE_STORAGE_ERROR);
-                Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId, maxUploadEventsAtOnce);
-                setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-                Map<String, List<Map<String, Object>>> events = buildEventMap(eventHandles);
+                Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId, 10000);
 
-                // Retry uploading `uploadRetryCount` times
-                String response = null;
-                for (int i = 0; i < uploadRetryCount; i++) {
-                    try {
-                        response = publishAll(useProject, callback, events);
-                        break;
-                    }
-                    catch (Exception e) {
-                        KeenLogging.log("publishAll error occurred(" + i + "/" + uploadRetryCount + ") : " + e.getMessage());
-                        if (!enableRetryUploading || i >= uploadRetryCount - 1) {
-                            throw e;
-                        }
-                        double wait = uploadRetryIntervalCoeficient * Math.pow(uploadRetryIntervalBase, Float.valueOf(String.valueOf(i)));
-                        Thread.sleep((long) (wait * 1000));
-                    }
-                }
+                // Two iterations to divide up eventHandles so that:
+                // 1. Send only one collection per one request to support API that only support one collection per request.
+                // 2. Send maxUploadEventsAtOnce number of events per request.
+                for (Map.Entry<String, List<Object>> entry: eventHandles.entrySet()) {
+                    String collectionName = entry.getKey();
+                    List<Object> handles = entry.getValue();
+                    int numberOfHandles = handles.size();
+                    for(int chunkIndex=0; chunkIndex<numberOfHandles; chunkIndex+=maxUploadEventsAtOnce) {
+                        List<Object> chunkedHandles = Arrays.asList(Arrays.copyOfRange(handles.toArray(), chunkIndex, Math.min(numberOfHandles,chunkIndex+maxUploadEventsAtOnce)).clone());
+                        Map<String, List<Object>> collectionEventHandles = new HashMap<>();
+                        collectionEventHandles.put(collectionName, chunkedHandles);
 
-                if (response != null) {
-                    try {
                         setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-                        handleAddEventsResponse(eventHandles, response);
-                    }
-                    catch (Exception e) {
-                        // Errors handling the response are non-fatal; just log them.
-                        KeenLogging.log("Error handling response to batch publish: " + e.getMessage());
+                        Map<String, List<Map<String, Object>>> events = buildEventMap(collectionEventHandles);
+
+                        String response;
+                        try {
+                            response = publishAll(useProject, callback, events);
+                        } catch (Exception e) {
+                            KeenLogging.log("publishAll error occurred" + e.getMessage());
+                            response = null;
+                        }
+
+                        if (response != null) {
+                            try {
+                                setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
+                                handleAddEventsResponse(collectionEventHandles, response);
+                            } catch (Exception e) {
+                                // Errors handling the response are non-fatal; just log them.
+                                KeenLogging.log("Error handling response to batch publish: " + e.getMessage());
+                            }
+                        }
                     }
                 }
 
-                Map<String, List<Object>> remainingHandles = getEventStore().getHandles(projectId, 1);
+                // Retry uploading logics:
+                // 1. Check if there are any remaining events
+                // 2. Only retry if enableRetryUploading && retryCounter < uploadRetryCount - 1
+                Map<String, List<Object>> remainingHandles = eventStore.getHandles(projectId, 1);
                 long remainingEvents = 0;
                 for (Map.Entry<String, List<Object>> handle : remainingHandles.entrySet()) {
                     remainingEvents += handle.getValue().size();
                 }
 
-                hasNext = remainingEvents > 0;
-            } while (hasNext);
+                doRetry = remainingEvents > 0 && (enableRetryUploading && retryCounter < uploadRetryCount - 1);
+                if (doRetry) {
+                    double wait = uploadRetryIntervalCoeficient * Math.pow(uploadRetryIntervalBase, Float.valueOf(String.valueOf(retryCounter)));
+                    Thread.sleep((long) (wait * 1000));
+                    retryCounter += 1;
+                }
+            } while (doRetry);
 
             handleSuccess(callback);
         } catch (Exception e) {

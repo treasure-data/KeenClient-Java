@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -333,7 +334,7 @@ public class KeenClientTest {
         Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
         expectedResponse.put(TEST_COLLECTION, 3);
         Map<String, Object> responseMap = buildSuccessMap(expectedResponse);
-        replaceSuccessWithFailure(responseMap, TEST_COLLECTION, 2, "TestInjectedError",
+        replaceSuccessWithFailure(responseMap, TEST_COLLECTION, 0, "TestInjectedError",
                 "This is an error injected by the unit test code");
         setMockResponse(200, getPostEventsResponse(responseMap));
 
@@ -346,7 +347,7 @@ public class KeenClientTest {
         List<Object> handles = handleMap.get(TEST_COLLECTION);
         assertEquals(1, handles.size());
         Object handle = handles.get(0);
-        assertThat(store.get(handle), containsString("test-value-2"));
+        assertThat(store.get(handle), containsString("test-value-0"));
     }
 
     @Test
