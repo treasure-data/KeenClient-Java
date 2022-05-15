@@ -51,7 +51,7 @@ public class KeenClientTest {
 
     private static List<Map<String, Object>> TEST_EVENTS;
 
-    private static final String TEST_COLLECTION = "test_collection";
+    private static final String TEST_COLLECTION = "test_database.test_table";
     private static final String TEST_COLLECTION_2 = "test_collection_2";
 
     private static final String POST_EVENT_SUCCESS = "{\"created\": true}";

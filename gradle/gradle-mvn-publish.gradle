@@ -1,3 +1,39 @@
+apply plugin: 'maven-publish'
+
+//simple settings
+project.afterEvaluate {
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                //setGroupId groupId
+                setGroupId GROUP
+                //setArtifactId artifactId
+                setArtifactId POM_ARTIFACT_ID
+                version VERSION_NAME
+
+                from components.java
+//                artifact bundleDebugAar
+
+/* add a dependency into generated .pom file
+                pom.withXml {
+                    def dependenciesNode = asNode().appendNode('dependencies')
+                    def dependencyNode = dependenciesNode.appendNode('dependency')
+                    dependencyNode.appendNode('groupId', 'com.company')
+                    dependencyNode.appendNode('artifactId', 'HelloWorld-core')
+                    dependencyNode.appendNode('version', '1.1')
+
+                }
+*/
+            }
+        }
+    }
+
+//    signing {
+//        sign publishing.publications.mavenJava
+//    }
+}
+
+
 //apply plugin: 'maven'
 //apply plugin: 'signing'
 

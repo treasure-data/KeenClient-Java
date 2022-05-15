@@ -369,9 +369,10 @@ public class KeenClient {
 
                         String response;
                         try {
-                            response = publishAll(useProject, callback, events);
+                            Map.Entry<String, List<Map<String, Object>>> eventsEntry = events.entrySet().iterator().next();
+                            response = publishToIngest(useProject, callback, eventsEntry.getKey(), eventsEntry.getValue());
                         } catch (Exception e) {
-                            KeenLogging.log("publishAll error occurred" + e.getMessage());
+                            KeenLogging.log("publishToIngest error occurred" + e.getMessage());
                             response = null;
                         }
 
@@ -1199,6 +1200,27 @@ public class KeenClient {
                 KeenConstants.API_VERSION, project.getProjectId(), eventCollection);
         URL url = new URL(urlString);
         return publishObject(project, url, event);
+    }
+
+    /**
+     * Publishes a batch of events to Treasure Data C360 Ingest Service.
+     *
+     * @param project The project in which to publish the event.
+     * @param collectionName collection name of the publishing events.
+     * @param events Publishing events.
+     * @return The response from the server.
+     * @throws IOException If there was an error communicating with the server.
+     */
+    private String publishToIngest(KeenProject project,
+                                   KeenCallback callback,
+                                   String collectionName,
+                                   List<Map<String, Object>> events) throws IOException {
+        String[] parts = collectionName.split("\\.");
+        String urlString = String.format(Locale.US, "%s/%s/%s", getBaseUrl(), parts[0], parts[1]);
+        URL url = new URL(urlString);
+        Map<String, List<Map<String, Object>>> requestData = new HashMap<>();
+        requestData.put("events", events);
+        return publishObject(project, url, callback, requestData);
     }
 
     /**
