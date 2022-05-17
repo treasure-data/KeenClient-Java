@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -360,30 +361,16 @@ public class KeenClient {
                     List<Object> handles = entry.getValue();
                     int numberOfHandles = handles.size();
                     for(int chunkIndex=0; chunkIndex<numberOfHandles; chunkIndex+=maxUploadEventsAtOnce) {
-                        List<Object> chunkedHandles = Arrays.asList(Arrays.copyOfRange(handles.toArray(), chunkIndex, Math.min(numberOfHandles,chunkIndex+maxUploadEventsAtOnce)).clone());
-                        Map<String, List<Object>> collectionEventHandles = new HashMap<>();
-                        collectionEventHandles.put(collectionName, chunkedHandles);
-
+                        List<Object> chunkedHandles = new LinkedList(Arrays.asList(Arrays.copyOfRange(handles.toArray(), chunkIndex, Math.min(numberOfHandles,chunkIndex+maxUploadEventsAtOnce)).clone()));
                         setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-                        Map<String, List<Map<String, Object>>> events = buildEventMap(collectionEventHandles);
+                        List<Map<String, Object>> eventsList = buildCollectionEventMap(chunkedHandles);
 
-                        String response;
                         try {
-                            Map.Entry<String, List<Map<String, Object>>> eventsEntry = events.entrySet().iterator().next();
-                            response = publishToIngest(useProject, callback, eventsEntry.getKey(), eventsEntry.getValue());
+                            String response = publishToIngest(useProject, callback, collectionName, eventsList);
+                            setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
+                            handleIngestResponse(chunkedHandles, response);
                         } catch (Exception e) {
                             KeenLogging.log("publishToIngest error occurred" + e.getMessage());
-                            response = null;
-                        }
-
-                        if (response != null) {
-                            try {
-                                setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
-                                handleAddEventsResponse(collectionEventHandles, response);
-                            } catch (Exception e) {
-                                // Errors handling the response are non-fatal; just log them.
-                                KeenLogging.log("Error handling response to batch publish: " + e.getMessage());
-                            }
                         }
                     }
                 }
@@ -1185,6 +1172,49 @@ public class KeenClient {
     }
 
     /**
+     * Builds a list of event maps, given a list of handles belonging to a collection.
+     * This method just uses the event store to retrieve each event by its handle.
+     *
+     * @param handles Event handles list of a collection
+     * @return List of event maps.
+     * @throws IOException If there is an error retrieving events from the store.
+     */
+    private List<Map<String, Object>> buildCollectionEventMap(List<Object> handles) throws IOException {
+        // Skip event collections that don't contain any events.
+        if (handles == null || handles.size() == 0) {
+            return null;
+        }
+
+        List<Object> removedHandles = new ArrayList<Object>();
+
+        // Build the event list by retrieving events from the store.
+        List<Map<String, Object>> events = new ArrayList<Map<String, Object>>(handles.size());
+        for (Object handle : handles) {
+            // Get the event from the store.
+            String jsonEvent = eventStore.get(handle);
+
+            // De-serialize the event from its JSON.
+            StringReader reader = new StringReader(jsonEvent);
+            Map<String, Object> event = null;
+            try {
+                event = jsonHandler.readJson(reader);
+            } catch (Exception e) {
+                KeenLogging.log("Failed to read event json: " + e.getMessage());
+            }
+            KeenUtils.closeQuietly(reader);
+            if (event == null) {
+                KeenLogging.log("This event can't handle as a proper JSON. Removing it...");
+                eventStore.remove(handle);
+                removedHandles.add(handle);
+                continue;
+            }
+            events.add(event);
+        }
+        handles.removeAll(removedHandles);
+        return events;
+    }
+
+    /**
      * Publishes a single event to the Keen service.
      *
      * @param project         The project in which to publish the event.
@@ -1345,45 +1375,76 @@ public class KeenClient {
 
             // Iterate through the elements in the collection
             List<Map<String, Object>> eventResults = (List<Map<String, Object>>) entry.getValue();
-            int index = 0;
-            for (Map<String, Object> eventResult : eventResults) {
-                // now loop through each event collection's individual results
-                boolean removeCacheEntry = true;
-                boolean success = (Boolean) eventResult.get(KeenConstants.SUCCESS_PARAM);
-                if (!success) {
-                    // grab error code and description
-                    Map errorDict = (Map) eventResult.get(KeenConstants.ERROR_PARAM);
-                    String errorCode = (String) errorDict.get(KeenConstants.NAME_PARAM);
-                    if (errorCode.equals(KeenConstants.INVALID_COLLECTION_NAME_ERROR) ||
-                            errorCode.equals(KeenConstants.INVALID_PROPERTY_NAME_ERROR) ||
-                            errorCode.equals(KeenConstants.INVALID_PROPERTY_VALUE_ERROR)) {
-                        removeCacheEntry = true;
-                        KeenLogging.log("An invalid event was found. Deleting it. Error: " +
-                                errorDict.get(KeenConstants.DESCRIPTION_PARAM));
-                    } else {
-                        String description = (String) errorDict.get(KeenConstants.DESCRIPTION_PARAM);
-                        removeCacheEntry = false;
-                        KeenLogging.log(String.format(Locale.US,
-                                "The event could not be inserted for some reason. " +
-                                "Error name and description: %s %s", errorCode,
-                                description));
-                    }
-                }
+            cleanUpUploadedCollectionEvents(collectionHandles, eventResults);
+        }
+    }
 
-                // If the cache entry should be removed, get the handle at the appropriate index
-                // and ask the event store to remove it.
-                if (removeCacheEntry) {
-                    Object handle = collectionHandles.get(index);
-                    // Try to remove the object from the cache. Catch and log exceptions to prevent
-                    // a single failure from derailing the rest of the cleanup.
-                    try {
-                        eventStore.remove(handle);
-                    } catch (IOException e) {
-                        KeenLogging.log("Failed to remove object '" + handle + "' from cache");
-                    }
+    /**
+     * Handles a response from the Treasure Data ingest service to a batch post events operation. In particular,
+     * this method will iterate through the responses and remove any successfully processed events
+     * (or events which failed for known fatal reasons) from the event store so they won't be sent
+     * in subsequent posts.
+     *
+     * @param collectionHandles A list of handles in the event store. This is
+     *                 referenced against the response from the server to determine which events to
+     *                 remove from the store.
+     * @param response The response from the server.
+     * @throws IOException If there is an error removing events from the store.
+     */
+    private void handleIngestResponse(List<Object> collectionHandles, String response) throws IOException {
+        StringReader reader = new StringReader(response);
+        Map<String, Object> responseMap = jsonHandler.readJsonWithoutDecryption(reader);
+        List<Map<String, Object>> eventResults = (List<Map<String, Object>>) responseMap.get("receipts");
+        cleanUpUploadedCollectionEvents(collectionHandles, eventResults);
+    }
+
+    /**
+     * Clean up any successfully processed (uploaded) events
+     * and any events that server deems to be invalid from event store
+     * @param collectionHandles A list of handles in the event store. This is
+     *      *                 referenced against the response from the server to determine which events to
+     *      *                 remove from the store.
+     * @param eventResults List of results from uploaded events.
+     */
+    private void cleanUpUploadedCollectionEvents(List<Object> collectionHandles, List<Map<String, Object>> eventResults) {
+        int index = 0;
+        for (Map<String, Object> eventResult : eventResults) {
+            // now loop through each event collection's individual results
+            boolean removeCacheEntry = true;
+            boolean success = (Boolean) eventResult.get(KeenConstants.SUCCESS_PARAM);
+            if (!success) {
+                // grab error code and description
+                Map errorDict = (Map) eventResult.get(KeenConstants.ERROR_PARAM);
+                String errorCode = (String) errorDict.get(KeenConstants.NAME_PARAM);
+                if (errorCode.equals(KeenConstants.INVALID_COLLECTION_NAME_ERROR) ||
+                        errorCode.equals(KeenConstants.INVALID_PROPERTY_NAME_ERROR) ||
+                        errorCode.equals(KeenConstants.INVALID_PROPERTY_VALUE_ERROR)) {
+                    removeCacheEntry = true;
+                    KeenLogging.log("An invalid event was found. Deleting it. Error: " +
+                            errorDict.get(KeenConstants.DESCRIPTION_PARAM));
+                } else {
+                    String description = (String) errorDict.get(KeenConstants.DESCRIPTION_PARAM);
+                    removeCacheEntry = false;
+                    KeenLogging.log(String.format(Locale.US,
+                            "The event could not be inserted for some reason. " +
+                                    "Error name and description: %s %s", errorCode,
+                            description));
                 }
-                index++;
             }
+
+            // If the cache entry should be removed, get the handle at the appropriate index
+            // and ask the event store to remove it.
+            if (removeCacheEntry) {
+                Object handle = collectionHandles.get(index);
+                // Try to remove the object from the cache. Catch and log exceptions to prevent
+                // a single failure from derailing the rest of the cleanup.
+                try {
+                    eventStore.remove(handle);
+                } catch (IOException e) {
+                    KeenLogging.log("Failed to remove object '" + handle + "' from cache");
+                }
+            }
+            index++;
         }
     }
 

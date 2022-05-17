@@ -287,7 +287,7 @@ public class KeenClientTest {
     public void testSendQueuedEvents() throws Exception {
         // Mock the response from the server.
         Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
-        expectedResponse.put(TEST_COLLECTION, 3);
+        expectedResponse.put("receipts", 3);
         setMockResponse(200, getPostEventsResponse(buildSuccessMap(expectedResponse)));
 
         // Queue some events.
@@ -318,6 +318,35 @@ public class KeenClientTest {
     }
 
     @Test
+    public void testSendQueuedEventsWithInvalidEventFromStore() throws Exception {
+        // Disable retry to check that invalid event is removed from store successfully.
+        client.enableRetryUploading = false;
+
+        // Queue some events with one invalid event stored.
+        client.getEventStore().store(TEST_PROJECT.getProjectId(), TEST_COLLECTION, "");
+        client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(0));
+        client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(1));
+
+        // Check that the expected number of events are in the store.
+        RamEventStore store = (RamEventStore) client.getEventStore();
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
+        assertEquals(1, handleMap.size());
+        assertEquals(3, handleMap.get(TEST_COLLECTION).size());
+
+        // Mock a response of 2 successful uploaded events.
+        Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
+        expectedResponse.put("receipts", 2);
+        setMockResponse(200, getPostEventsResponse(buildSuccessMap(expectedResponse)));
+
+        // Send the events.
+        client.sendQueuedEvents();
+
+        // Validate that the store has no events left because the invalid event is removed from store + 2 successfully uploaded events.
+        handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
+        assertEquals(0, handleMap.size());
+    }
+
+    @Test
     public void testSendQueuedEventsWithSingleFailure() throws Exception {
         // Queue some events.
         client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(0));
@@ -332,9 +361,9 @@ public class KeenClientTest {
 
         // Mock a response containing an error.
         Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
-        expectedResponse.put(TEST_COLLECTION, 3);
+        expectedResponse.put("receipts", 3);
         Map<String, Object> responseMap = buildSuccessMap(expectedResponse);
-        replaceSuccessWithFailure(responseMap, TEST_COLLECTION, 0, "TestInjectedError",
+        replaceSuccessWithFailure(responseMap, "receipts", 0, "TestInjectedError",
                 "This is an error injected by the unit test code");
         setMockResponse(200, getPostEventsResponse(responseMap));
 
