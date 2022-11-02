@@ -370,7 +370,7 @@ public class KeenClient {
                             setCallbackToCurrentErrorCode(callback, ERROR_CODE_DATA_CONVERSION);
                             handleIngestResponse(chunkedHandles, response);
                         } catch (Exception e) {
-                            KeenLogging.log("publishToIngest error occurred" + e.getMessage());
+                            KeenLogging.log("publishToIngest error occurred " + e.getMessage());
                         }
                     }
                 }
@@ -971,18 +971,20 @@ public class KeenClient {
 
         // build the event
         Map<String, Object> newEvent = new HashMap<String, Object>();
+
+        // The code below is commented out because we no longer support "keen" column in Ingest API
         // handle keen properties
-        Calendar currentTime = Calendar.getInstance();
-        String timestamp = ISO_8601_FORMAT.format(currentTime.getTime());
-        if (keenProperties == null) {
-            keenProperties = new HashMap<String, Object>();
-            keenProperties.put("timestamp", timestamp);
-        } else {
-            if (!keenProperties.containsKey("timestamp")) {
-                keenProperties.put("timestamp", timestamp);
-            }
-        }
-        newEvent.put("keen", keenProperties);
+//        Calendar currentTime = Calendar.getInstance();
+//        String timestamp = ISO_8601_FORMAT.format(currentTime.getTime());
+//        if (keenProperties == null) {
+//            keenProperties = new HashMap<String, Object>();
+//            keenProperties.put("timestamp", timestamp);
+//        } else {
+//            if (!keenProperties.containsKey("timestamp")) {
+//                keenProperties.put("timestamp", timestamp);
+//            }
+//        }
+//        newEvent.put("keen", keenProperties);
 
         // handle global properties
         Map<String, Object> globalProperties = getGlobalProperties();
