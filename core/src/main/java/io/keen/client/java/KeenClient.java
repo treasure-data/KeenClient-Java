@@ -1,17 +1,11 @@
 package io.keen.client.java;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -52,6 +46,8 @@ import io.keen.client.java.http.UrlConnectionHttpHandler;
  * @since 1.0.0
  */
 public class KeenClient {
+    private static final String PREF_MIGRATED_CACHE_TO_INGEST = "PREF_MIGRATED_CACHE_TO_INGEST";
+
     private int maxUploadEventsAtOnce = 400;
 
     ///// PUBLIC STATIC METHODS /////
@@ -331,6 +327,11 @@ public class KeenClient {
      * @param callback An optional callback to receive notification of success or failure.
      */
     public synchronized void sendQueuedEvents(KeenProject project, KeenCallback callback) {
+        try {
+            migrateDBToSupportIngestIfNeeded(project);
+        } catch (Exception e) {
+            KeenLogging.log("Failed to migrateDBToSupportIngestIfNeeded " + e.getMessage());
+        }
 
         setCallbackToCurrentErrorCode(callback, ERROR_CODE_INIT_ERROR);
         if (!isActive) {
@@ -395,6 +396,45 @@ public class KeenClient {
             handleSuccess(callback);
         } catch (Exception e) {
             handleFailure(callback, e);
+        }
+    }
+
+    /**
+     * Migrate db to support ingest with the best effort strategy. If somehow the migration failed. we won't try again.
+     */
+    public void migrateDBToSupportIngestIfNeeded(KeenProject project) throws IOException {
+        if (eventStore.getPreference(PREF_MIGRATED_CACHE_TO_INGEST, "false") == "true") {
+            return;
+        }
+
+        // We will never try to migrate a gain no mater whether the migration below succeeds or not.
+        eventStore.setPreference(PREF_MIGRATED_CACHE_TO_INGEST, "true");
+
+        KeenProject useProject = (project == null ? defaultProject : project);
+        String projectId = useProject.getProjectId();
+        Map<String, List<Object>> eventHandles = eventStore.getHandles(projectId, 10000);
+        for (Map.Entry<String, List<Object>> entry: eventHandles.entrySet()) {
+            String collectionName = entry.getKey();
+            List<Object> handles = entry.getValue();
+
+            // Get all events of collectionName
+            List<Map<String, Object>> eventsList = buildCollectionEventMap(handles);
+
+            // Remove all cached events of collectionName
+            for (Object handle: handles) {
+                eventStore.remove(handle);
+            }
+
+            // Re-add newly formatted events of collectionName
+            for (Map<String, Object> event: eventsList) {
+                String uuid = (String) event.get("#UUID");
+                event.remove("keen");
+                event.remove("#UUID");
+                event.remove("#SSUT");
+                if (event.isEmpty()) { continue; }
+                if (uuid != null) { event.put("uuid", uuid); }
+                queueEvent(collectionName, event);
+            }
         }
     }
 
@@ -1074,9 +1114,6 @@ public class KeenClient {
         if (depth == 0) {
             if (event == null || event.size() == 0) {
                 throw new InvalidEventException("You must specify a non-null, non-empty event.");
-            }
-            if (event.containsKey("keen")) {
-                throw new InvalidEventException("An event cannot contain a root-level property named 'keen'.");
             }
         } else if (depth > KeenConstants.MAX_EVENT_DEPTH) {
             throw new InvalidEventException("An event's depth (i.e. layers of nesting) cannot exceed " +

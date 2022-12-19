@@ -1,12 +1,6 @@
 package io.keen.client.java;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -43,6 +37,29 @@ public class FileEventStore implements KeenEventStore {
     }
 
     ///// PUBLIC METHODS /////
+
+     public void setPreference(String key, String value) throws IOException {
+        File preferenceFile = new File(this.getKeenCacheDirectory(), key);
+
+        Writer writer = null;
+        try {
+            OutputStream out = new FileOutputStream(preferenceFile);
+            writer = new OutputStreamWriter(out, ENCODING);
+            writer.write(value);
+        } finally {
+            KeenUtils.closeQuietly(writer);
+        }
+    }
+
+     public String getPreference(String key, String defaultValue) throws IOException {
+        File preferenceFile = new File(this.getKeenCacheDirectory(), key);
+
+        if (preferenceFile.exists() && preferenceFile.isFile()) {
+            return KeenUtils.convertFileToString(preferenceFile);
+        } else {
+            return defaultValue;
+        }
+    }
 
     /**
      * {@inheritDoc}
