@@ -403,7 +403,7 @@ public class KeenClient {
      * Migrate db to support ingest with the best effort strategy. If somehow the migration failed. we won't try again.
      */
     public void migrateDBToSupportIngestIfNeeded(KeenProject project) throws IOException {
-        if (eventStore.getPreference(PREF_MIGRATED_CACHE_TO_INGEST, "false") == "true") {
+        if (eventStore.getPreference(PREF_MIGRATED_CACHE_TO_INGEST, "false").equals("true")) {
             return;
         }
 

@@ -1,15 +1,7 @@
 package io.keen.client.java;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implementation of the {@link io.keen.client.java.KeenEventStore} interface using the file system
@@ -39,20 +31,21 @@ public class FileEventStore implements KeenEventStore {
     ///// PUBLIC METHODS /////
 
      public void setPreference(String key, String value) throws IOException {
-        File preferenceFile = new File(this.getKeenCacheDirectory(), key);
+        File preferenceFile = new File(this.getKeenPreferencesDirectory(), key);
 
         Writer writer = null;
         try {
             OutputStream out = new FileOutputStream(preferenceFile);
             writer = new OutputStreamWriter(out, ENCODING);
             writer.write(value);
+            writer.flush();
         } finally {
             KeenUtils.closeQuietly(writer);
         }
     }
 
      public String getPreference(String key, String defaultValue) throws IOException {
-        File preferenceFile = new File(this.getKeenCacheDirectory(), key);
+        File preferenceFile = new File(this.getKeenPreferencesDirectory(), key);
 
         if (preferenceFile.exists() && preferenceFile.isFile()) {
             return KeenUtils.convertFileToString(preferenceFile);
@@ -221,6 +214,17 @@ public class FileEventStore implements KeenEventStore {
             boolean dirMade = file.mkdirs();
             if (!dirMade) {
                 throw new IOException("Could not make keen cache directory at: " + file.getAbsolutePath());
+            }
+        }
+        return file;
+    }
+
+    private File getKeenPreferencesDirectory() throws IOException {
+        File file = new File(root, "keenpreferences");
+        if (!file.exists()) {
+            boolean dirMade = file.mkdirs();
+            if (!dirMade) {
+                throw new IOException("Could not make keenpreferences cache directory at: " + file.getAbsolutePath());
             }
         }
         return file;
