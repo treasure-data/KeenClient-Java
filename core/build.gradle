@@ -20,6 +20,9 @@ jar {
 
 test {
     include '**/*Test.class'
+    testLogging {
+        events "PASSED", "SKIPPED", "FAILED"
+    }
 }
 
 archivesBaseName = "keen-client-java-core"
