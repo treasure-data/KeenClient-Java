@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -50,7 +52,7 @@ public class KeenClientTest {
 
     private static List<Map<String, Object>> TEST_EVENTS;
 
-    private static final String TEST_COLLECTION = "test_collection";
+    private static final String TEST_COLLECTION = "test_database.test_table";
     private static final String TEST_COLLECTION_2 = "test_collection_2";
 
     private static final String POST_EVENT_SUCCESS = "{\"created\": true}";
@@ -120,6 +122,80 @@ public class KeenClientTest {
     }
 
     @Test
+    public void testMigrateToIngestOnlyOnce() throws KeenException {
+        try {
+            // Should be able to migrate empty db
+            client.migrateDBToSupportIngestIfNeeded(client.getDefaultProject());
+            Map<String, List<Object>> handleMap = client.getEventStore().getHandles(client.getDefaultProject().getProjectId(), 10000);
+            assertEquals(0, handleMap.size());
+
+            Map<String, Object> keenProperty = new HashMap<>();
+            keenProperty.put("timestamp", "test-timestamp");
+
+            // This event will be migrated because client has run migration once.
+            Map<String, Object> event0 = new HashMap<String, Object>();
+            event0.put("keen", keenProperty);
+            event0.put("#SSUT", "test-ssut");
+
+            // This event will be migrated as per normal
+            Map<String, Object> event1 = new HashMap<String, Object>();
+            event1.put("key", "value");
+
+            client.queueEvent("foo.bar", event0);
+            client.queueEvent("foo.bar", event1);
+
+            client.migrateDBToSupportIngestIfNeeded(client.getDefaultProject());
+
+            handleMap = client.getEventStore().getHandles(client.getDefaultProject().getProjectId(), 10000);
+            assertEquals(2, handleMap.get("foo.bar").size());
+        } catch (Exception e) {
+            assertNull(e);
+        }
+    }
+
+    @Test
+    public void testMigrateDBToIngest() throws KeenException {
+        try {
+            Map<String, Object> keenProperty = new HashMap<>();
+            keenProperty.put("timestamp", "test-timestamp");
+
+            // This event won't be migrated
+            Map<String, Object> event0 = new HashMap<String, Object>();
+            event0.put("keen", keenProperty);
+            event0.put("#SSUT", "test-ssut");
+
+            // This event won't be migrated
+            Map<String, Object> event1 = new HashMap<String, Object>();
+            event1.put("keen", keenProperty);
+            event1.put("#UUID", "test-uuid");
+            event1.put("#SSUT", "test-ssut");
+
+            // This event will be migrated
+            Map<String, Object> event2 = new HashMap<String, Object>();
+            event2.put("key", "value");
+            event2.put("keen", keenProperty);
+            event2.put("#UUID", "test-uuid");
+            event2.put("#SSUT", "test-ssut");
+
+            // This event will be migrated
+            Map<String, Object> event3 = new HashMap<String, Object>();
+            event3.put("key", "value");
+
+            client.queueEvent("foo.bar", event0);
+            client.queueEvent("foo.bar", event1);
+            client.queueEvent("foo.bar", event2);
+            client.queueEvent("foo.bar", event3);
+
+            client.migrateDBToSupportIngestIfNeeded(client.getDefaultProject());
+
+            Map<String, List<Object>>  handleMap = client.getEventStore().getHandles(client.getDefaultProject().getProjectId(), 10000);
+            assertEquals(2, handleMap.get("foo.bar").size());
+        } catch (Exception e) {
+            assertNull(e);
+        }
+    }
+
+    @Test
     public void testInvalidEventCollection() throws KeenException {
         runValidateAndBuildEventTest(TestUtils.getSimpleEvent(), "$asd", "collection can't start with $",
                 "An event collection name cannot start with the dollar sign ($) character.");
@@ -139,14 +215,6 @@ public class KeenClientTest {
     public void emptyEvent() throws Exception {
         runValidateAndBuildEventTest(new HashMap<String, Object>(), "foo", "empty event",
                 "You must specify a non-null, non-empty event.");
-    }
-
-    @Test
-    public void eventWithKeenRootProperty() throws Exception {
-        Map<String, Object> event = new HashMap<String, Object>();
-        event.put("keen", "reserved");
-        runValidateAndBuildEventTest(event, "foo", "keen reserved",
-                "An event cannot contain a root-level property named 'keen'.");
     }
 
     @Test
@@ -210,11 +278,6 @@ public class KeenClientTest {
         Map<String, Object> builtEvent = client.validateAndBuildEvent(client.getDefaultProject(), "foo", event, null);
         assertNotNull(builtEvent);
         assertEquals("valid value", builtEvent.get("valid key"));
-        // also make sure the event has been timestamped
-        @SuppressWarnings("unchecked")
-        Map<String, Object> keenNamespace = (Map<String, Object>) builtEvent.get("keen");
-        assertNotNull(keenNamespace);
-        assertNotNull(keenNamespace.get("timestamp"));
     }
 
     @Test
@@ -286,7 +349,7 @@ public class KeenClientTest {
     public void testSendQueuedEvents() throws Exception {
         // Mock the response from the server.
         Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
-        expectedResponse.put(TEST_COLLECTION, 3);
+        expectedResponse.put("receipts", 3);
         setMockResponse(200, getPostEventsResponse(buildSuccessMap(expectedResponse)));
 
         // Queue some events.
@@ -317,6 +380,35 @@ public class KeenClientTest {
     }
 
     @Test
+    public void testSendQueuedEventsWithInvalidEventFromStore() throws Exception {
+        // Disable retry to check that invalid event is removed from store successfully.
+        client.enableRetryUploading = false;
+
+        // Queue some events with one invalid event stored.
+        client.getEventStore().store(TEST_PROJECT.getProjectId(), TEST_COLLECTION, "");
+        client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(0));
+        client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(1));
+
+        // Check that the expected number of events are in the store.
+        RamEventStore store = (RamEventStore) client.getEventStore();
+        Map<String, List<Object>> handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
+        assertEquals(1, handleMap.size());
+        assertEquals(3, handleMap.get(TEST_COLLECTION).size());
+
+        // Mock a response of 2 successful uploaded events.
+        Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
+        expectedResponse.put("receipts", 2);
+        setMockResponse(200, getPostEventsResponse(buildSuccessMap(expectedResponse)));
+
+        // Send the events.
+        client.sendQueuedEvents();
+
+        // Validate that the store has no events left because the invalid event is removed from store + 2 successfully uploaded events.
+        handleMap = store.getHandles(TEST_PROJECT.getProjectId(), 100);
+        assertEquals(0, handleMap.size());
+    }
+
+    @Test
     public void testSendQueuedEventsWithSingleFailure() throws Exception {
         // Queue some events.
         client.queueEvent(TEST_COLLECTION, TEST_EVENTS.get(0));
@@ -331,9 +423,9 @@ public class KeenClientTest {
 
         // Mock a response containing an error.
         Map<String, Integer> expectedResponse = new HashMap<String, Integer>();
-        expectedResponse.put(TEST_COLLECTION, 3);
+        expectedResponse.put("receipts", 3);
         Map<String, Object> responseMap = buildSuccessMap(expectedResponse);
-        replaceSuccessWithFailure(responseMap, TEST_COLLECTION, 2, "TestInjectedError",
+        replaceSuccessWithFailure(responseMap, "receipts", 0, "TestInjectedError",
                 "This is an error injected by the unit test code");
         setMockResponse(200, getPostEventsResponse(responseMap));
 
@@ -346,7 +438,7 @@ public class KeenClientTest {
         List<Object> handles = handleMap.get(TEST_COLLECTION);
         assertEquals(1, handles.size());
         Object handle = handles.get(0);
-        assertThat(store.get(handle), containsString("test-value-2"));
+        assertThat(store.get(handle), containsString("test-value-0"));
     }
 
     @Test
@@ -421,7 +513,7 @@ public class KeenClientTest {
         Map<String, Object> event = TestUtils.getSimpleEvent();
         String eventCollection = String.format("foo%d", Calendar.getInstance().getTimeInMillis());
         Map<String, Object> builtEvent = client.validateAndBuildEvent(client.getDefaultProject(), eventCollection, event, null);
-        assertEquals(expectedNumProperties + 1, builtEvent.size());
+        assertEquals(expectedNumProperties, builtEvent.size());
         return builtEvent;
     }
 
@@ -470,7 +562,7 @@ public class KeenClientTest {
         Map<String, Object> event = TestUtils.getSimpleEvent();
         String eventCollection = String.format("foo%d", Calendar.getInstance().getTimeInMillis());
         Map<String, Object> builtEvent = client.validateAndBuildEvent(client.getDefaultProject(), eventCollection, event, null);
-        assertEquals(expectedNumProperties + 1, builtEvent.size());
+        assertEquals(expectedNumProperties, builtEvent.size());
         return builtEvent;
     }
 
@@ -501,7 +593,7 @@ public class KeenClientTest {
 
         assertEquals("bar", builtEvent.get("foo"));
         assertEquals(6, builtEvent.get("default property"));
-        assertEquals(3, builtEvent.size());
+        assertEquals(2, builtEvent.size());
     }
 
     private void runValidateAndBuildEventTest(Map<String, Object> event, String eventCollection, String msg,

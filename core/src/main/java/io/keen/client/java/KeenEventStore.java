@@ -13,6 +13,9 @@ import java.util.Map;
  */
 public interface KeenEventStore {
 
+    void setPreference(String key, String value) throws IOException;
+    String getPreference(String key, String defaultValue) throws IOException;
+
     /**
      * Stores the given event.
      *
@@ -58,5 +61,4 @@ public interface KeenEventStore {
      * @throws IOException If there is an error retrieving the handles.
      */
     Map<String, List<Object>> getHandles(String projectId, int limit) throws IOException;
-
 }

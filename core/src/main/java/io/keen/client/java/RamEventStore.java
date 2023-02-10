@@ -27,11 +27,27 @@ public class RamEventStore implements KeenEventStore {
      * Constructs a new RAM-based event store.
      */
     public RamEventStore() {
+        preferences = new HashMap<>();
         collectionIds = new HashMap<String, List<Long>>();
         events = new HashMap<Long, String>();
     }
 
     ///// KeenEventStore METHODS /////
+
+    @Override
+    public String getPreference(String key, String defaultValue) throws IOException {
+        String pref = preferences.get(key);
+        if (pref != null) {
+            return pref;
+        } else {
+            return defaultValue;
+        }
+    }
+
+    @Override
+    public void setPreference(String key, String value) throws IOException {
+        preferences.put(key, value);
+    }
 
     /**
      * {@inheritDoc}
@@ -146,6 +162,7 @@ public class RamEventStore implements KeenEventStore {
 
     ///// PRIVATE FIELDS /////
 
+    private Map<String, String> preferences;
     private long nextId = 0;
     private Map<String, List<Long>> collectionIds;
     private Map<Long, String> events;

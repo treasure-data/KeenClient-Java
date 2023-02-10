@@ -1,21 +1,7 @@
 package io.keen.client.java;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.io.*;
+import java.util.*;
 
 /**
  * Implementation of the {@link io.keen.client.java.KeenEventStore} interface using the file system
@@ -43,6 +29,30 @@ public class FileEventStore implements KeenEventStore {
     }
 
     ///// PUBLIC METHODS /////
+
+     public void setPreference(String key, String value) throws IOException {
+        File preferenceFile = new File(this.getKeenPreferencesDirectory(), key);
+
+        Writer writer = null;
+        try {
+            OutputStream out = new FileOutputStream(preferenceFile);
+            writer = new OutputStreamWriter(out, ENCODING);
+            writer.write(value);
+            writer.flush();
+        } finally {
+            KeenUtils.closeQuietly(writer);
+        }
+    }
+
+     public String getPreference(String key, String defaultValue) throws IOException {
+        File preferenceFile = new File(this.getKeenPreferencesDirectory(), key);
+
+        if (preferenceFile.exists() && preferenceFile.isFile()) {
+            return KeenUtils.convertFileToString(preferenceFile);
+        } else {
+            return defaultValue;
+        }
+    }
 
     /**
      * {@inheritDoc}
@@ -209,6 +219,17 @@ public class FileEventStore implements KeenEventStore {
         return file;
     }
 
+    private File getKeenPreferencesDirectory() throws IOException {
+        File file = new File(root, "keenpreferences");
+        if (!file.exists()) {
+            boolean dirMade = file.mkdirs();
+            if (!dirMade) {
+                throw new IOException("Could not make keenpreferences cache directory at: " + file.getAbsolutePath());
+            }
+        }
+        return file;
+    }
+
     /**
      * Gets an array containing all of the sub-directories in the given parent directory.
      *
@@ -217,11 +238,13 @@ public class FileEventStore implements KeenEventStore {
      * @throws IOException If there is an error listing the files in the directory.
      */
     private File[] getSubDirectories(File parent) throws IOException {
-        return parent.listFiles(new FileFilter() { // Can return null if there are no events
+        File[] files = parent.listFiles(new FileFilter() { // Can return null if there are no events
             public boolean accept(File file) {
                 return file.isDirectory();
             }
         });
+        Arrays.sort(files);
+        return files;
     }
 
     /**
@@ -231,11 +254,13 @@ public class FileEventStore implements KeenEventStore {
      * @return An array containing all of the files in the given directory.
      */
     private File[] getFilesInDir(File dir) {
-        return dir.listFiles(new FileFilter() {
+        File[] files = dir.listFiles(new FileFilter() {
             public boolean accept(File file) {
                 return file.isFile();
             }
         });
+        Arrays.sort(files);
+        return files;
     }
 
     /**

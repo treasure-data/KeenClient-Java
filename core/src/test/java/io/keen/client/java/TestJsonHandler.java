@@ -33,7 +33,7 @@ class TestJsonHandler implements KeenJsonHandler {
     public Map<String, Object> readJsonWithoutDecryption(Reader reader)
             throws IOException
     {
-        return null;
+        return mapper.readValue(reader, MAP_TYPE);
     }
 
     /**
