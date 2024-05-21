@@ -46,6 +46,12 @@ project.afterEvaluate {
                             name = POM_DEVELOPER_NAME
                             email = POM_DEVELOPER_EMAIL
                         }
+
+                        developer {
+                            id = POM_DEVELOPER_ID_TD
+                            name = POM_DEVELOPER_NAME_TD
+                            email = POM_DEVELOPER_EMAIL_TD
+                        }
                     }
                 }
 
