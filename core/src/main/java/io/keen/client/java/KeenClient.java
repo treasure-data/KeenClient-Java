@@ -503,6 +503,8 @@ public class KeenClient {
         return jsonHandler;
     }
 
+    public HttpHandler getHttpHandler() { return httpHandler; }
+
     /**
      * Gets the event store for this client.
      *
